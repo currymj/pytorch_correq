@@ -5,26 +5,19 @@ import itertools
 class InverseCorrelatedEquilibriumProblem:
 
     def __init__(self,
-                 K,
-                 player_action_dims,
+                 game,
                  observed_strategy,
-                 payoff_features,
                  deviations):
-        self.num_players = len(player_action_dims)
-        self.player_action_dims = player_action_dims
+        self.game = game
         self.observed_strategy = observed_strategy
-        self.payoff_features_fn = payoff_features
         self.deviations = deviations
         self.memoize_regrets_dict = {}
-        self.K = K
 
-    def enumerate_joint_actions(self):
-        return itertools.product(*[range(d) for d in self.player_action_dims])
 
     def predicted_strategy(self, theta):
-        unnormalized_dist = torch.zeros(*self.player_action_dims)
+        unnormalized_dist = torch.zeros(*self.game.player_action_dims)
         # dot product of each regret feat with each theta
-        for joint_action in self.enumerate_joint_actions():
+        for joint_action in self.game.enumerate_joint_actions():
             action_regret_feats = self.compute_phi_regrets_for_action(torch.tensor(list(joint_action)))
             action_regret_scalars = torch.sum(action_regret_feats * theta, dim=len(theta.shape) - 1)
             unnormalized_dist[joint_action] = torch.exp(-torch.sum(action_regret_scalars))
@@ -32,25 +25,27 @@ class InverseCorrelatedEquilibriumProblem:
         return unnormalized_dist / Z
 
     def compute_phi_regrets_for_action(self, action_tens):
+        # this function compute per-action regrets, recording them in a dictionary so
+        # they are not recomputed more than once
         key = tuple(action_tens.numpy())
         if key in self.memoize_regrets_dict:
             return self.memoize_regrets_dict[key]
 
         # these are the instantaneous regrets for all the specific deviations
-        regret_feats = torch.zeros(*self.deviations.deviations_dim(), self.K, requires_grad=False)
+        regret_feats = torch.zeros(*self.deviations.deviations_dim(), self.game.K, requires_grad=False)
         dev_iter = self.deviations.enumerator()
         for deviation in dev_iter():
             deviation_applied = self.deviations.apply_deviation(action_tens, deviation)
             # get regrets for specific player only (player is specified by 0 of deviation)
-            regret_feats[deviation] = self.payoff_features_fn(deviation_applied)[deviation[0]] - \
-                                      self.payoff_features_fn(action_tens)[deviation[0]]
+            regret_feats[deviation] = self.game.features(deviation_applied)[deviation[0]] - \
+                                      self.game.features(action_tens)[deviation[0]]
         self.memoize_regrets_dict[key] = regret_feats
         return regret_feats
 
     def compute_expected_regret_feats(self, action_dist):
-        total_regret_feats = torch.zeros(*self.deviations.deviations_dim(), self.K, requires_grad=False)
+        total_regret_feats = torch.zeros(*self.deviations.deviations_dim(), self.game.K, requires_grad=False)
         n = 0
-        for joint_action in self.enumerate_joint_actions():
+        for joint_action in self.game.enumerate_joint_actions():
             n += 1
             total_regret_feats += action_dist[joint_action] * self.compute_phi_regrets_for_action(
                 torch.tensor(list(joint_action)))
@@ -70,14 +65,14 @@ class InverseCorrelatedEquilibriumProblem:
 
             fstar_ind = little_scalar_regrets.argmax()
 
-            g[deviation] = regret_feats_observed.view(-1, self.K)[fstar_ind] - regret_feats_predicted[deviation]
+            g[deviation] = regret_feats_observed.view(-1, self.game.K)[fstar_ind] - regret_feats_predicted[deviation]
         return g
 
     def maxent_dual_objective(self, theta):
         bigZ = torch.tensor(0.0, requires_grad=True)
 
         # for each joint action in A
-        for joint_action in self.enumerate_joint_actions():
+        for joint_action in self.game.enumerate_joint_actions():
             little_r_a_feats = self.compute_phi_regrets_for_action(torch.tensor(list(joint_action)))
             # scalar features for all deviations f with their own theta_fs
             little_r_a_scalar = torch.sum(little_r_a_feats * theta, dim=len(theta.shape) - 1)
