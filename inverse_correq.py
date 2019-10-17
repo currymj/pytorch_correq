@@ -9,18 +9,13 @@ class InverseCorrelatedEquilibriumProblem:
                  player_action_dims,
                  observed_strategy,
                  payoff_features,
-                 deviations_dim,
-                 get_deviation_iter,
-                 apply_deviation):
+                 deviations):
         self.num_players = len(player_action_dims)
         self.player_action_dims = player_action_dims
         self.observed_strategy = observed_strategy
         self.payoff_features_fn = payoff_features
-        self.deviations_dim = deviations_dim
-        self.get_deviation_iter = get_deviation_iter
-        self.apply_deviation_fn = apply_deviation
+        self.deviations = deviations
         self.memoize_regrets_dict = {}
-        assert self.deviations_dim[0] == self.num_players
         self.K = K
 
     def enumerate_joint_actions(self):
@@ -42,10 +37,10 @@ class InverseCorrelatedEquilibriumProblem:
             return self.memoize_regrets_dict[key]
 
         # these are the instantaneous regrets for all the specific deviations
-        regret_feats = torch.zeros(*self.deviations_dim, self.K, requires_grad=False)
-        dev_iter = self.get_deviation_iter(self.player_action_dims)
+        regret_feats = torch.zeros(*self.deviations.deviations_dim(), self.K, requires_grad=False)
+        dev_iter = self.deviations.enumerator()
         for deviation in dev_iter():
-            deviation_applied = self.apply_deviation_fn(action_tens, deviation)
+            deviation_applied = self.deviations.apply_deviation(action_tens, deviation)
             # get regrets for specific player only (player is specified by 0 of deviation)
             regret_feats[deviation] = self.payoff_features_fn(deviation_applied)[deviation[0]] - \
                                       self.payoff_features_fn(action_tens)[deviation[0]]
@@ -53,7 +48,7 @@ class InverseCorrelatedEquilibriumProblem:
         return regret_feats
 
     def compute_expected_regret_feats(self, action_dist):
-        total_regret_feats = torch.zeros(*self.deviations_dim, self.K, requires_grad=False)
+        total_regret_feats = torch.zeros(*self.deviations.deviations_dim(), self.K, requires_grad=False)
         n = 0
         for joint_action in self.enumerate_joint_actions():
             n += 1
@@ -62,7 +57,7 @@ class InverseCorrelatedEquilibriumProblem:
         return total_regret_feats / n
 
     def analytic_gradient(self, theta):
-        dev_iter = self.get_deviation_iter(self.player_action_dims)
+        dev_iter = self.deviations.enumerator()
         regret_feats_observed = self.compute_expected_regret_feats(self.observed_strategy)
         regret_feats_predicted = self.compute_expected_regret_feats(self.predicted_strategy(theta))
         g = torch.zeros_like(theta, requires_grad=False)
@@ -94,7 +89,7 @@ class InverseCorrelatedEquilibriumProblem:
         expected_er_feats = self.compute_expected_regret_feats(self.observed_strategy)
 
         # for each deviation
-        dev_iter = self.get_deviation_iter(self.player_action_dims)
+        dev_iter = self.deviations.enumerator()
         for deviation in dev_iter():
             this_deviation_theta = theta[deviation].view(*[1 for _ in deviation], -1)  # unsqueeze to broadcast
             # sorry that is a really hacky way to do it, but i think it does what we want

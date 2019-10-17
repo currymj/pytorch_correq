@@ -1,7 +1,7 @@
 import torch
 from inverse_correq import InverseCorrelatedEquilibriumProblem
 from game import chicken_feats
-from deviations import switch_enumerator, apply_switch_deviation
+from deviations import SwitchDeviations
 
 def optimize_analytic(prob_obj, theta, epochs=100, lr=0.1):
     for i in range(epochs):
@@ -10,15 +10,14 @@ def optimize_analytic(prob_obj, theta, epochs=100, lr=0.1):
     return theta
 
 if __name__ == '__main__':
+    player_action_dims = (2,2)
     corr_chicken = torch.tensor([[0.0, 0.4], [0.4, 0.2]])
     corr_chicken_approx = torch.tensor([[0.0,0.42], [0.38, 0.2]])
     correq_theta = torch.zeros(2,2,2,3, requires_grad=False)
-    chicken_obj_int = InverseCorrelatedEquilibriumProblem(3, (2, 2),
+    chicken_obj_int = InverseCorrelatedEquilibriumProblem(3, player_action_dims,
                                                           corr_chicken_approx,
                                                           chicken_feats,
-                                                          (2, 2, 2),
-                                                          switch_enumerator,
-                                                          apply_switch_deviation)
+                                                          SwitchDeviations(player_action_dims))
     print('observed strategy', corr_chicken_approx)
     print('strategy at initialization', chicken_obj_int.predicted_strategy(correq_theta))
     optimize_analytic(chicken_obj_int, correq_theta, epochs=10000, lr=0.1)
@@ -30,9 +29,11 @@ if __name__ == '__main__':
     corr_chicken_approx = torch.tensor([[0.0, 0.46], [0.54, 0.0]])
 
     correq_theta = torch.ones(2, 2, 2, 3)
-    chicken_obj_int = InverseCorrelatedEquilibriumProblem(3, (2, 2), corr_chicken_approx, chicken_feats, (2, 2, 2),
-                                                          switch_enumerator, apply_switch_deviation)
 
+    chicken_obj_int = InverseCorrelatedEquilibriumProblem(3, player_action_dims,
+                                                          corr_chicken_approx,
+                                                          chicken_feats,
+                                                          SwitchDeviations(player_action_dims))
 
     print('observed strategy', corr_chicken_approx)
     print('strategy at initialization', chicken_obj_int.predicted_strategy(correq_theta))
