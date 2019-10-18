@@ -13,10 +13,23 @@ class InverseCorrelatedEquilibriumProblem:
         self.deviations = deviations
         self.memoize_regrets_dict = {}
 
+        # preallocation slots
+
+        self._g = None
+        self._regret_feats_observed = self.compute_expected_regret_feats(self.observed_strategy)
+        self._predicted = None
 
     def predicted_strategy(self, theta):
         unnormalized_dist = torch.zeros(*self.game.player_action_dims)
         # dot product of each regret feat with each theta
+        for joint_action in self.game.enumerate_joint_actions():
+            action_regret_feats = self.compute_phi_regrets_for_action(torch.tensor(list(joint_action)))
+            action_regret_scalars = torch.sum(action_regret_feats * theta, dim=len(theta.shape) - 1)
+            unnormalized_dist[joint_action] = torch.exp(-torch.sum(action_regret_scalars))
+        Z = torch.sum(unnormalized_dist)
+        return unnormalized_dist / Z
+
+    def predicted_strategy_(self, unnormalized_dist, theta):
         for joint_action in self.game.enumerate_joint_actions():
             action_regret_feats = self.compute_phi_regrets_for_action(torch.tensor(list(joint_action)))
             action_regret_scalars = torch.sum(action_regret_feats * theta, dim=len(theta.shape) - 1)
@@ -53,20 +66,26 @@ class InverseCorrelatedEquilibriumProblem:
 
     def analytic_gradient(self, theta):
         dev_iter = self.deviations.enumerator()
-        regret_feats_observed = self.compute_expected_regret_feats(self.observed_strategy)
-        regret_feats_predicted = self.compute_expected_regret_feats(self.predicted_strategy(theta))
-        g = torch.zeros_like(theta, requires_grad=False)
+        if self._predicted is not None:
+            self.predicted_strategy_(self._predicted, theta)
+        else:
+            self._predicted = (self.predicted_strategy(theta))
+        regret_feats_predicted = self.compute_expected_regret_feats(self._predicted)
+        if self._g is not None:
+            self._g.zero_()
+        else:
+            self._g = torch.zeros_like(theta, requires_grad=False)
         for deviation in dev_iter():
             this_deviation_theta = theta[deviation].view(*[1 for _ in deviation], -1)  # unsqueeze to broadcast
             # sorry that is a really hacky way to do it, but i think it does what we want
             # i.e. add one empty dim for all dims of deviations, then -1 for the dim that is size K
-            little_scalar_regrets = torch.sum(regret_feats_observed * this_deviation_theta, dim=len(theta.shape) - 1)
+            little_scalar_regrets = torch.sum(self._regret_feats_observed * this_deviation_theta, dim=len(theta.shape) - 1)
             #  now argmax
 
             fstar_ind = little_scalar_regrets.argmax()
 
-            g[deviation] = regret_feats_observed.view(-1, self.game.K)[fstar_ind] - regret_feats_predicted[deviation]
-        return g
+            self._g[deviation] = self._regret_feats_observed.view(-1, self.game.K)[fstar_ind] - regret_feats_predicted[deviation]
+        return self._g
 
     def maxent_dual_objective(self, theta):
         bigZ = torch.tensor(0.0, requires_grad=True)
