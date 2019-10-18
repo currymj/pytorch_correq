@@ -42,7 +42,7 @@ if __name__ == '__main__':
                                                           SwitchDeviations(routing_game.player_action_dims))
     print('observed strategy', routing_approx)
     print('strategy at initialization', routing_obj_int.predicted_strategy(correq_theta))
-    optimize_analytic(routing_obj_int, correq_theta, epochs=100, lr=1.0)
+    optimize_analytic(routing_obj_int, correq_theta, epochs=10000, lr=1.0)
     predicted_strategy = routing_obj_int.predicted_strategy(correq_theta)
     print('Predicted strategy', predicted_strategy)
     print('true strategy', routing_correq)

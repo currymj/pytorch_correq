@@ -30,6 +30,7 @@ def sampled_observed_dist(true_dist, N=100):
         total_dist[index] += 1.0
     return (total_dist / N).view(true_dist_shape)
 
+
 if __name__ == '__main__':
     player_action_dims = (2,2)
     eps = 0.01

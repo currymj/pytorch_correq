@@ -6,7 +6,8 @@ class FixedDeviations:
         self.player_action_dims = player_action_dims
 
     def deviations_dim(self):
-        return self.player_action_dims
+        # problematic, not general enough
+        return (len(self.player_action_dims), self.player_action_dims[0])
 
     def enumerator(self):
         def e():
@@ -28,10 +29,8 @@ class SwitchDeviations:
         self.player_action_dims = player_action_dims
 
     def deviations_dim(self):
-        player_dims_list = list(self.player_action_dims)
-        # tack on the action dim again (switch corresponds to pairs of actions)
-        result_list = player_dims_list + player_dims_list[-1:]
-        return tuple(result_list)
+        #????
+        return (len(self.player_action_dims), self.player_action_dims[0], self.player_action_dims[0])
 
     def enumerator(self):
         def e():
