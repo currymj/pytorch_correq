@@ -3,6 +3,18 @@ import itertools
 
 
 class InverseCorrelatedEquilibriumProblem:
+    """
+    This class takes a game object, an empirical strategy, and an object representing the set of deviations,
+    and performs computations related to the maxent inverse correlated equilibrium optimization problem.
+
+    Most of the work is done on arrays associated with the dual variables. The shape of these arrays varies
+    depending on the game and deviation set, but in general they are of shape
+
+                    (num_players x ...deviations... x feature_dim)
+
+    For example, for a 2-player game, with 2 actions, and features of dimension 3, with switch deviations,
+    these tensors are of size 2 x 2 x 2 x 3.
+    """
 
     def __init__(self,
                  game,
@@ -20,6 +32,7 @@ class InverseCorrelatedEquilibriumProblem:
         self._predicted = None
 
     def predicted_strategy(self, theta):
+        """computes a predicted strategy given values for the dual variables."""
         unnormalized_dist = torch.zeros(*self.game.player_action_dims)
         # dot product of each regret feat with each theta
         for joint_action in self.game.enumerate_joint_actions():
@@ -30,6 +43,7 @@ class InverseCorrelatedEquilibriumProblem:
         return unnormalized_dist / Z
 
     def predicted_strategy_(self, unnormalized_dist, theta):
+        """computes a predicted strategy in-place on a preallocated array"""
         for joint_action in self.game.enumerate_joint_actions():
             action_regret_feats = self.compute_phi_regrets_for_action(torch.tensor(list(joint_action)))
             action_regret_scalars = torch.sum(action_regret_feats * theta, dim=len(theta.shape) - 1)

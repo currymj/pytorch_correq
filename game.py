@@ -32,9 +32,6 @@ class RoutingGame:
 
         return payoffs
 
-
-
-
     def enumerate_joint_actions(self):
         return itertools.product(*[range(d) for d in self.player_action_dims])
 

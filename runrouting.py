@@ -5,6 +5,7 @@ from deviations import SwitchDeviations
 import math
 from test import routing_correq
 
+
 def logloss(truth, prediction, epsilon=0.0):
     loss = 0.0
     truth_flat = truth.view(-1)
@@ -15,11 +16,13 @@ def logloss(truth, prediction, epsilon=0.0):
             loss -= truth_flat[i] * torch.log((1-epsilon)*prediction_flat[i] + epsilon/N)
     return loss/math.log(2)
 
+
 def optimize_analytic(prob_obj, theta, epochs=100, lr=0.1):
     for i in range(epochs):
         g = prob_obj.analytic_gradient(theta)
         theta -= lr*g
     return theta
+
 
 def sampled_observed_dist(true_dist, N=100):
     # sample N points, sum
