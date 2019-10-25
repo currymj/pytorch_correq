@@ -15,7 +15,7 @@ class RoutingGame:
         for action in action_tuple:
             if action % 2 == 0:
                 left += 1
-            if action / 2 == 0:
+            if action // 2 == 0:
                 back += 1
 
         payoffs = torch.zeros(self.num_players, self.K)
@@ -24,7 +24,7 @@ class RoutingGame:
                 u = v + torch.tensor([1.0, 1.5, 1.0/20.0, 2.0])
             else:
                 u = v + torch.tensor([1.0+2.0*left, 1.0, 1.0/20.0 + 0.04*left, 1.5+.4*left])
-            if action_tuple[player] % 2 == 0:
+            if action_tuple[player] // 2 == 0:
                 u = v + torch.tensor([6.0+0.5*back, 12.0, 1.0/7.0 + 0.01*back, 10.0+3.0*back])
             else:
                 u = v + torch.tensor([2.0, 20.0, 1.0/8.0, 15.0])
